@@ -1,0 +1,28 @@
+{
+    "carpeta_vigilada": "%USERPROFILE%\\Downloads",
+    "github_raw_base_url": "",
+    "reglas": [
+        {
+            "criterio": "contiene",
+            "texto": "Factura",
+            "accion": "copiar",
+            "carpeta_destino": "%USERPROFILE%\\Documents\\Facturas",
+            "crear_subcarpeta": false
+        },
+        {
+            "criterio": "termina_con",
+            "texto": ".pdf",
+            "accion": "mover",
+            "carpeta_destino": "%USERPROFILE%\\Documents\\PDFs",
+            "crear_subcarpeta": false
+        },
+        {
+            "criterio": "contiene",
+            "texto": "Proyecto",
+            "accion": "mover",
+            "carpeta_destino": "%USERPROFILE%\\Desktop\\Proyectos",
+            "crear_subcarpeta": true
+        }
+    ],
+    "tema_visual": "Sistema"
+}

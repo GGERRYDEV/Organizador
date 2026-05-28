@@ -1,0 +1,29 @@
+# Logs locales
+organizador.log
+
+# Caches y bytecodes de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# Archivos temporales o de configuracion de editores (VS Code, PyCharm, etc.)
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Accesos directos de Windows creados localmente
+*.lnk
+
+# Configuracion personal del usuario
+config.json
