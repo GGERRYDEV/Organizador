@@ -5,6 +5,8 @@ import time
 import shutil
 import logging
 import threading
+import tkinter as tk
+from tkinter import messagebox
 
 # Carga dinámica de dependencias
 try:
@@ -14,8 +16,6 @@ try:
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
 except ImportError as e:
-    import tkinter as tk
-    from tkinter import messagebox
     root = tk.Tk()
     root.withdraw()
     messagebox.showerror(
@@ -1550,6 +1550,14 @@ class OrganizadorApp:
         ):
             self.stop_watcher_internal()
             
+            # Detener el icono de la bandeja de sistema si existe
+            if self.tray_icon:
+                try:
+                    self.tray_icon.stop()
+                except Exception as e:
+                    self.log(f"No se pudo detener el icono de la bandeja: {e}")
+            
+            # Eliminar accesos directos de Inicio (Startup)
             startup_dir = os.path.join(
                 os.environ.get("APPDATA", ""),
                 r"Microsoft\Windows\Start Menu\Programs\Startup"
@@ -1561,30 +1569,72 @@ class OrganizadorApp:
                 if os.path.exists(path):
                     try:
                         os.remove(path)
+                        self.log(f"Acceso directo de inicio eliminado: {file}")
                     except Exception as e:
-                        self.log(f"No se pudo eliminar el acceso directo {file}: {e}")
+                        self.log(f"No se pudo eliminar el acceso directo de inicio {file}: {e}")
             
-            if self.tray_icon:
-                self.tray_icon.stop()
-                
-            # Programar eliminación diferida de la carpeta del script en Windows
-            import subprocess
-            folder_to_delete = SCRIPT_DIR
-            cmd = f'Start-Sleep -Seconds 2; Remove-Item -Path "{folder_to_delete}" -Recurse -Force'
-            
+            # Intentar obtener la ruta del Escritorio de forma robusta en Windows
+            desktop_paths = []
             try:
-                subprocess.Popen(
-                    ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", cmd],
-                    creationflags=0x08000000  # CREATE_NO_WINDOW
-                )
-            except Exception as e:
-                self.log(f"Error al iniciar desinstalador diferido: {e}")
+                import ctypes
+                from ctypes import wintypes
+                buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+                # CSIDL_DESKTOP = 0
+                ctypes.windll.shell32.SHGetFolderPathW(None, 0, None, 0, buf)
+                if buf.value:
+                    desktop_paths.append(buf.value)
+            except Exception:
+                pass
                 
+            # Fallbacks comunes para la ruta del Escritorio
+            home = os.path.expanduser("~")
+            desktop_paths.append(os.path.join(home, "Desktop"))
+            desktop_paths.append(os.path.join(home, "OneDrive", "Desktop"))
+            
+            # Eliminar acceso directo del Escritorio
+            for dp in desktop_paths:
+                path = os.path.join(dp, "Organizador de Archivos.lnk")
+                if os.path.exists(path):
+                    try:
+                        os.remove(path)
+                        self.log(f"Acceso directo del Escritorio eliminado: {path}")
+                    except Exception as e:
+                        self.log(f"No se pudo eliminar el acceso directo del Escritorio {path}: {e}")
+            
+            # Mostrar mensaje informativo de cierre
             messagebox.showinfo(
                 "Desinstalación Iniciada",
                 "La aplicación se cerrará ahora y la carpeta del organizador será eliminada permanentemente del equipo."
             )
             
+            # Programar eliminación diferida de la carpeta del script en Windows.
+            # Usamos el PID de Python para esperar a que el proceso principal termine por completo
+            # antes de intentar borrar la carpeta.
+            import subprocess
+            folder_to_delete = SCRIPT_DIR
+            pid = os.getpid()
+            
+            # Comando PowerShell:
+            # 1. Espera a que termine el proceso de Python (Timeout de 15 segundos para evitar bucles infinitos)
+            # 2. Cambia la ubicación de trabajo a TEMP para evitar que PowerShell bloquee la carpeta
+            # 3. Elimina la carpeta de forma recursiva y forzada
+            cmd = (
+                f"Start-Sleep -Seconds 1; "
+                f"$proc = Get-Process -Id {pid} -ErrorAction SilentlyContinue; "
+                f"if ($proc) {{ $proc | Wait-Process -Timeout 15 }}; "
+                f"Set-Location -Path $env:TEMP; "
+                f"Remove-Item -Path '{folder_to_delete}' -Recurse -Force"
+            )
+            
+            try:
+                subprocess.Popen(
+                    ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", cmd],
+                    creationflags=0x08000000,  # CREATE_NO_WINDOW
+                    cwd=os.environ.get("TEMP", "C:\\")  # Iniciar en TEMP para evitar bloqueos del CWD
+                )
+            except Exception as e:
+                self.log(f"Error al iniciar desinstalador diferido: {e}")
+                
             self.window.after(0, self.window.destroy)
             sys.exit(0)
 
