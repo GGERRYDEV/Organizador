@@ -1621,9 +1621,13 @@ class OrganizadorApp:
             cmd = (
                 f"Start-Sleep -Seconds 1; "
                 f"$proc = Get-Process -Id {pid} -ErrorAction SilentlyContinue; "
-                f"if ($proc) {{ $proc | Wait-Process -Timeout 15 }}; "
+                f"if ($proc) {{ try {{ $proc | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue }} catch {{}} }}; "
+                f"Start-Sleep -Seconds 1; "
                 f"Set-Location -Path $env:TEMP; "
-                f"Remove-Item -Path '{folder_to_delete}' -Recurse -Force"
+                f"Get-ChildItem -Path '{folder_to_delete}' -Force -Recurse -ErrorAction SilentlyContinue | "
+                f"Sort-Object -Property {{$_.FullName.Length}} -Descending | "
+                f"Remove-Item -Force -ErrorAction SilentlyContinue; "
+                f"Remove-Item -Path '{folder_to_delete}' -Force -ErrorAction SilentlyContinue"
             )
             
             try:
